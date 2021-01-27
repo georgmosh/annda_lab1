@@ -55,7 +55,7 @@ def drawLine2P(x,y,xlims):
 def plot_loss(loss_train, loss_val, num_epochs):
     epochs = range(1, num_epochs + 1)
     plt.plot(epochs, loss_train, 'g', label='Training loss')
-    #plt.plot(epochs, loss_val, 'b', label='validation loss')
+    plt.plot(epochs, loss_val, 'b', label='validation loss')
     plt.title('Training and Validation loss')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
@@ -104,30 +104,51 @@ def mlp(hidden_nodes):
     num_of_datapoints, class_A, class_B = generateDatapoints()
     x_axis = [class_A[0], class_B[0]]
     y_axis = [class_A[1], class_B[1]]
-    losses = []
+    losses = np.zeros(num_epochs)
+    val_losses = np.zeros(num_epochs)
+    num_crossval_runs = 5
     
     class_A_all = [class_A[0], class_A[1], np.zeros(int(num_of_datapoints/2))]
     class_B_all = [class_B[0], class_B[1], np.ones(num_of_datapoints)]
 
 #    plot(class_A[0], class_A[1], class_B[0], class_B[1])    
-    data = np.transpose(np.concatenate((class_A_all, class_B_all), axis=1))
-    np.random.shuffle(data)
-    target = data[:,2].copy()
-    data[:,2] = 1
+    dataset = np.transpose(np.concatenate((class_A_all, class_B_all), axis=1))
+    np.random.shuffle(dataset)
+    target_whole = dataset[:,2].copy()
+    dataset[:,2] = 1
 
-    W1 = np.random.rand(hidden_nodes, 3)
-    W2 = np.random.rand(1, hidden_nodes)
+    d_train = int(0.8 * num_of_datapoints)
+    data = dataset[0:d_train,:] 
+    val_data = dataset[d_train:,:]
+    target = target_whole[0:d_train]
+    val_target = target_whole[d_train:]
     
-    for epoch in range(0, num_epochs):
-        h1, o1, h2, o2 = forward_pass(data, W1, W2)
+    for _ in range(0, num_crossval_runs):
+        W1 = np.random.rand(hidden_nodes, 3)
+        W2 = np.random.rand(1, hidden_nodes)
+        
+        for epoch in range(0, num_epochs):
+            ### --------------- TRAINING --------------- ##
+            h1, o1, h2, o2 = forward_pass(data, W1, W2)
+        
+            loss = MSE(target, o2[0])
+            losses[epoch] += loss
+        
+            backward_pass(lr, data, h1, o1, h2, o2, target, W1, W2)
     
-        loss = MSE(target, o2[0])
-        losses.append(loss)
+            ### --------------- VALIDATION --------------- ##
+            h1, o1, h2, o2 = forward_pass(val_data, W1, W2)
+        
+            loss = MSE(val_target, o2[0])
+            val_losses[epoch] += loss
     
-        backward_pass(lr, data, h1, o1, h2, o2, target, W1, W2)
-
-    val_losses = []
-    print("Loss per epoch", losses, val_losses)
+    losses /= num_crossval_runs
+    val_losses /= num_crossval_runs
+    losses = np.ndarray.tolist(losses)
+    val_losses = np.ndarray.tolist(val_losses)
+    
+    ### --------------- EVALUATION --------------- ##
+    print("Average loss per epoch", losses, val_losses)
     plot_loss(losses, val_losses, num_epochs)
     
 # --------------------- garbage
