@@ -15,7 +15,7 @@ def generateDatapoints():
     sigma_A = 0.2
 
     means_B = np.zeros(2)
-    means_B[0] -= 0.1
+    means_B[1] -= 0.1
 
     sigma_B = 0.3
 
@@ -55,12 +55,22 @@ def drawLine2P(x,y,xlims):
 def plot_loss(loss_train, loss_val, num_epochs):
     epochs = range(1, num_epochs + 1)
     plt.plot(epochs, loss_train, 'g', label='Training loss')
-   # plt.plot(epochs, loss_val, 'b', label='validation loss')
-    plt.title('Training and Validation loss')
+    plt.plot(epochs, loss_val, 'b', label='validation loss')
+    plt.title('Training vs Validation loss')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.legend()
-    plt.show()    
+    plt.show()
+
+def plot_accuracy(acc_train, acc_val, num_epochs):
+    epochs = range(1, num_epochs + 1)
+    plt.plot(epochs, acc_train, 'g', label='Training accuracy')
+    plt.plot(epochs, acc_val, 'b', label='validation accuracy')
+    plt.title('Training vs Validation accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.show()
  
 def activation(x):
     out = 2/(1 + np.exp(-x)) - 1
@@ -102,33 +112,35 @@ def backward_pass(lr, x, h1, o1, h2, o2, t, W1, W2):
     return W1, W2
 
 def MSE(t, o2):
-    loss = 0.5 * np.dot((t - o2), (t - o2))
+    loss = np.dot((t - o2), (t - o2)) / t.shape[0]
     return loss
 
 def mlp(hidden_nodes):
-    num_epochs = 100
+    num_epochs = 200
     lr = 0.01
     num_of_datapoints, class_A, class_B = generateDatapoints()
     x_axis = [class_A[0], class_B[0]]
     y_axis = [class_A[1], class_B[1]]
     losses = np.zeros(num_epochs)
     val_losses = np.zeros(num_epochs)
+    accuracies = np.zeros(num_epochs)
+    val_accuracies = np.zeros(num_epochs)
     num_crossval_runs = 1
     
     class_A_all = [class_A[0], class_A[1], -np.ones(int(num_of_datapoints/2))]
     class_B_all = [class_B[0], class_B[1], np.ones(num_of_datapoints)]
 
-#    plot(class_A[0], class_A[1], class_B[0], class_B[1])    
+    plot(class_A[0], class_A[1], class_B[0], class_B[1])
     dataset = np.transpose(np.concatenate((class_A_all, class_B_all), axis=1))
     np.random.shuffle(dataset)
     target_whole = dataset[:,2].copy()
     dataset[:,2] = 1
 
-    #d_train = int(0.8 * 2 * num_of_datapoints)
-    data = dataset#[0:d_train,:]
-  #  val_data = dataset[d_train:,:]
-    target = target_whole#[0:d_train]
-  #  val_target = target_whole[d_train:]
+    d_train = int(0.8 * 1.5 * num_of_datapoints)
+    data = dataset[0:d_train,:]
+    val_data = dataset[d_train:,:]
+    target = target_whole[0:d_train]
+    val_target = target_whole[d_train:]
     
     for _ in range(0, num_crossval_runs):
         W1 = np.random.rand(hidden_nodes - 1, 3)
@@ -140,33 +152,35 @@ def mlp(hidden_nodes):
         
             loss = MSE(target, o2[0])
             losses[epoch] += loss
-        
+
+            accuracy = np.sum(np.abs(o2 - target) < 1) / target.shape[0]
+            accuracies[epoch] += accuracy
+
             W1, W2 = backward_pass(lr, data, h1, o1, h2, o2, target, W1, W2)
 
-            print("hello")
             ### --------------- VALIDATION --------------- ##
-            # h1, o1, h2, o2 = forward_pass(val_data, W1, W2)
-            #
-            # loss = MSE(val_target, o2[0])
-            # val_losses[epoch] += loss
+            h1, o1, h2, o2 = forward_pass(val_data, W1, W2)
+
+            loss = MSE(val_target, o2[0])
+            val_losses[epoch] += loss
+
+            accuracy = np.sum(np.abs(o2 - val_target) < 1) / val_target.shape[0]
+            val_accuracies[epoch] += accuracy
     
     losses /= num_crossval_runs
-   # val_losses /= num_crossval_runs
+    val_losses /= num_crossval_runs
+    accuracies /= num_crossval_runs
+    val_accuracies /= num_crossval_runs
     losses = np.ndarray.tolist(losses)
-    val_losses = []#np.ndarray.tolist(val_losses)
-    
+    val_losses = np.ndarray.tolist(val_losses)
+    accuracies = np.ndarray.tolist(accuracies)
+    val_accuracies = np.ndarray.tolist(val_accuracies)
+
     ### --------------- EVALUATION --------------- ##
     print("Average loss per epoch", losses, val_losses)
     plot_loss(losses, val_losses, num_epochs)
-    
-# --------------------- garbage
-#    for epoch in range(0, num_epochs):
-#        delta = -lr * np.dot((np.dot(np.transpose(W), np.transpose(data)) - target), data)
-#        W = W + delta
 
-#    point_1 = [0, (-W[2]/W[0])]
-#    point_2 = [(-W[2]/W[1]), 0]
-#    plot_with_boundary(class_A[0], class_A[1], class_B[0], class_B[1], point_1, point_2)
-#    print(W)
+    print("Average accuracy per epoch", accuracies, val_accuracies)
+    plot_accuracy(accuracies, val_accuracies, num_epochs)
 
-mlp(100)
+mlp(3)
