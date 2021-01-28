@@ -115,6 +115,10 @@ def MSE(t, o2):
     loss = np.dot((t - o2), (t - o2)) / t.shape[0]
     return loss
 
+def MSE2(t, o2, dim):
+    loss = np.dot((t - o2), (t - o2)) / dim
+    return loss
+
 def mlp(hidden_nodes):
     num_epochs = 200
     lr = 0.01
@@ -125,7 +129,9 @@ def mlp(hidden_nodes):
     val_losses = np.zeros(num_epochs)
     accuracies = np.zeros(num_epochs)
     val_accuracies = np.zeros(num_epochs)
+    training_percentage = 0.8
     num_crossval_runs = 1
+    batch_mode = 1
     
     class_A_all = [class_A[0], class_A[1], -np.ones(int(num_of_datapoints/2))]
     class_B_all = [class_B[0], class_B[1], np.ones(num_of_datapoints)]
@@ -136,7 +142,7 @@ def mlp(hidden_nodes):
     target_whole = dataset[:,2].copy()
     dataset[:,2] = 1
 
-    d_train = int(0.8 * 1.5 * num_of_datapoints)
+    d_train = int(training_percentage * 1.5 * num_of_datapoints)
     data = dataset[0:d_train,:]
     val_data = dataset[d_train:,:]
     target = target_whole[0:d_train]
@@ -149,9 +155,16 @@ def mlp(hidden_nodes):
         for epoch in range(0, num_epochs):
             ### --------------- TRAINING --------------- ##
             h1, o1, h2, o2 = forward_pass(data, W1, W2)
-        
-            loss = MSE(target, o2[0])
-            losses[epoch] += loss
+
+            if(batch_mode == 1):
+                loss = MSE(target, o2[0])
+                losses[epoch] += loss
+            else:
+                loss = 0
+                for d in range(0, int(1.5 * training_percentage * num_of_datapoints)):
+                    point_loss = MSE2(target[d], o2[0][d], target.shape[0])
+                    loss += point_loss
+                losses[epoch] += loss
 
             accuracy = np.sum(np.abs(o2 - target) < 1) / target.shape[0]
             accuracies[epoch] += accuracy
@@ -161,8 +174,15 @@ def mlp(hidden_nodes):
             ### --------------- VALIDATION --------------- ##
             h1, o1, h2, o2 = forward_pass(val_data, W1, W2)
 
-            loss = MSE(val_target, o2[0])
-            val_losses[epoch] += loss
+            if (batch_mode == 1):
+                loss = MSE(val_target, o2[0])
+                val_losses[epoch] += loss
+            else:
+                loss = 0
+                for d in range(0, int(1.5 * (1-training_percentage) * num_of_datapoints)):
+                    point_loss = MSE2(val_target[d], o2[0][d], val_target.shape[0])
+                    loss += point_loss
+                val_losses[epoch] += loss
 
             accuracy = np.sum(np.abs(o2 - val_target) < 1) / val_target.shape[0]
             val_accuracies[epoch] += accuracy
